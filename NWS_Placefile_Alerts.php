@@ -57,7 +57,7 @@ $prunePoints    = 1000;         # prune coords with more than this number of poi
 $latitude = 37.155;
 $longitude = -121.898;
 $version  = 1.5;
-$doLogging = true;
+$doLogging = false;
 $doDebug = false; # =true; turn on additional display, may break placefile for GRLevelX
 # NWS timezone abbreviations used per https://www.weather.gov/gis/Counties
 # appears in Forecast, County and Fire zones (not in Marine)
