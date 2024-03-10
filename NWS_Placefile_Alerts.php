@@ -50,6 +50,9 @@ $cacheTimeMax  = 480;                   # number of seconds cache is 'fresh'
 $alertsURL = 'https://api.weather.gov/alerts/active?status=actual&region_type=land';
 $showDetails = true;                   # =false, show areas only; =true, show lines with popups
 $showMarine = true; # =true; for marine alerts, =false for land alerts
+if (!isset($showIcons)) {
+    $showIcons = false;
+}
 #
 $pruneThreshold = 0.0005;   # lat/long threshold for pruning points from polygons
 $prunePoints    = 1000;         # prune coords with more than this number of points
