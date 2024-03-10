@@ -41,6 +41,10 @@ $excludeAlerts = array(); /* debug */
 $TZ = 'UTC';                            # default timezone for display
 $timeFormat = "d-M-Y g:ia T";           # display format for times
 $maxDistance = 350;                     # generate entries only within this distance
+# Allow user to modify distance using parameter: ?maxDistance=250
+if(isset($_GET['maxDistance']) && is_numeric($_GET['maxDistance'])) {
+    $maxDistance = (float) $_GET['maxDistance'];
+}
 $cacheFilename = 'response_land.json';  # store json here
 $cacheTimeMax  = 480;                   # number of seconds cache is 'fresh'
 $alertsURL = 'https://api.weather.gov/alerts/active?status=actual&region_type=land';
@@ -171,7 +175,9 @@ $output .= "; running on PHP ".phpversion()."\n";
 $output .= "Title: NWS Alert $titleExtra - $today\n";
 $output .= "Refresh: 8\n";
 $output .= "Font: 1, 11, 1, \"Arial\"\n\n";
-if(!$showDetails) { # display icons in middle of areas
+
+# Allow user to enable icons: ?icons=y
+if($showIcons && !$showDetails) { # display icons in middle of areas
 	$output .= "IconFile: 1, 17, 17, 8, 8, alerts-icons.png\n";
 }
 
