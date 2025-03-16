@@ -38,6 +38,11 @@ $excludeAlerts = array(
 "Special Weather Statement"
 );
 $excludeAlerts = array(); /* debug */
+
+if (!isset($includeAlerts)) {
+    $includeAlerts = array();
+}
+
 $TZ = 'UTC';                            # default timezone for display
 $timeFormat = "d-M-Y g:ia T";           # display format for times
 $maxDistance = 350;                     # generate entries only within this distance
@@ -329,8 +334,9 @@ function JSONread($url) {
 #---------------------------------------------------------------------------
 
 function decodeAlert($A) {
-  global $color,$zoneLookup,$excludeAlerts,$timeFormat,$latitude,$longitude,$maxDistance,$showDetails,$titleExtra,$doDebug;
+  global $color,$zoneLookup,$excludeAlerts,$includeAlerts,$timeFormat,$latitude,$longitude,$maxDistance,$showDetails,$titleExtra,$doDebug;
 	global $NWStimeZones;
+	$tOut = "";
   # Decode a specific alert 
 	# return out as the full entry for the alert to JSONread for appending (uttimately) to $output for printing the placefile
 	#
@@ -625,6 +631,18 @@ Icon: 2, 0, "... <alert text>"
 		$out .= "; excluded in \$excludeAlerts\n\n";
 		if($doDebug) { $out .= "; decodeAlert: returned-#3\n"; }
 		return($out); # yes, excluded by event
+	}
+
+	# see if we need to not include this event type
+	if (!empty($includeAlerts) and !in_array($event,$includeAlerts)) {
+		$out .= "; $headline \n";
+    $out .= "; active: $onset to $expires\n";
+		$out .= "; severity=$severity\n";
+		$tZones = implode(', ',$P['geocode']['UGC']);
+		$out .= "; zone(s) '$tZones'\n";
+		$out .= "; not included in \$includeAlerts\n\n";
+		if($doDebug) { $out .= "; decodeAlert: returned-#7\n"; }
+		return($out); # yes, not included by event
 	}
 	
 	# see if the event has expired (unlikely, I hope)
@@ -1166,7 +1184,7 @@ Polygon 	array (
     /*:: :*/
     /*:: Official Web site: http://www.zipcodeworld.com :*/
     /*:: :*/
-    /*:: Hexa Software Development Center © All Rights Reserved 2004:*/
+    /*:: Hexa Software Development Center ï¿½ All Rights Reserved 2004:*/
     /*:: :*/
     /*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
 
