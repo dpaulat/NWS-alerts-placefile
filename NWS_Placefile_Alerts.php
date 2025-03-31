@@ -796,7 +796,7 @@ Icon: 2, 0, "... <alert text>"
 			$popup = str_replace($timeMarker,get_popup_local_times($P,$zone),$popup_template);
 			$LineCmd = 'Line: 2, 0, "' . $popup;
 			$tCmd .= $LineCmd;
-			if(count($coordsArray) > 1) {
+			if($coordsArray !== null && count($coordsArray) > 1) {
 				$coords = $coordsArray[0]; # multiple segments.. use first one.
 				$nCoords = explode("\n",$coords);		
 			}
