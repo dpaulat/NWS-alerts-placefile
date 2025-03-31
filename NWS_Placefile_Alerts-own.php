@@ -1,9 +1,11 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors','1');
+
+//error_reporting(E_ALL);
+ini_set('display_errors','0');
+
 /*
-*	Name:			    NWS_Placefile_Alerts.php
-*	Author(s):	  Mike Davis 0617	, Ken True saratoga-weather.org
+*	Name:			    NWS_Placefile_Alerts-own.php
+*	Author(s):	  Mike Davis 0617	, Ken True saratoga-weather.org - Modded by ELY M.  
 *	Description:	Reads NWS CAP1.1 ATOM RSS Alert Feeds for one or more states
 *                   and displays a GR2 placefile describing affected polygons.
 * rewritten to use api.weather.gov/alerts/active JSON from original XML by Ken True 29-Aug-2023
@@ -25,12 +27,13 @@ ini_set('display_errors','1');
 # Version 2.15 - 20-Oct-2023 - remove > 9999 limit with multi-pass simplify_RDP calls to prune points
 # Version 2.16 - 22-Oct-2023 - add debug and sce=view, correct severity sorting issue
 # Version 2.17 - 26-Oct-2023 - find crude centroid of NWS supplied alert polygons to position Icon
-# Version 2.18 - 24-Mar-2025 - fix Notice errata on calls to get_shape_coords not returning 3 values
+# Version 2.18 - 17-Feb-2025 - added $description and $instructions and updated shapefiles php      
 
-$Version = "NWS_Placefile_Alerts.php - V2.18 - 24-Mar-2025 - saratoga-weather.org";
+$Version = "NWS_Placefile_Alerts.php - V2.18 - 17-Feb-2025 - saratoga-weather.org - Modded by ELY M.";
 # -----------------------------------------------
 # Settings:
 # excludes:
+/*
 $excludeAlerts = array(
 "Severe Thunderstorm Warning",
 "Severe Weather Statement",
@@ -38,35 +41,25 @@ $excludeAlerts = array(
 "Flash Flood Warning",
 "Special Weather Statement"
 );
+*/
 $excludeAlerts = array(); /* debug */
-
-if (!isset($includeAlerts)) {
-    $includeAlerts = array();
-}
-
 $TZ = 'UTC';                            # default timezone for display
 $timeFormat = "d-M-Y g:ia T";           # display format for times
-$maxDistance = 350;                     # generate entries only within this distance
-# Allow user to modify distance using parameter: ?maxDistance=250
-if(isset($_GET['maxDistance']) && is_numeric($_GET['maxDistance'])) {
-    $maxDistance = (float) $_GET['maxDistance'];
-}
+$maxDistance = 9999;                     # generate entries only within this distance
 $cacheFilename = 'response_land.json';  # store json here
 $cacheTimeMax  = 480;                   # number of seconds cache is 'fresh'
 $alertsURL = 'https://api.weather.gov/alerts/active?status=actual&region_type=land';
-$showDetails = true;                   # =false, show areas only; =true, show lines with popups
-$showMarine = true; # =true; for marine alerts, =false for land alerts
-if (!isset($showIcons)) {
-    $showIcons = false;
-}
+$icons = true;  
+///$showDetails = false;                   # =false, show areas only; =true, show lines with popups
+$showMarine = false; # =true; for marine alerts, =false for land alerts
 #
 $pruneThreshold = 0.0005;   # lat/long threshold for pruning points from polygons
 $prunePoints    = 1000;         # prune coords with more than this number of points
 #
-$latitude = 37.155;
-$longitude = -121.898;
+$latitude = 44.000;
+$longitude = -92.898;
 $version  = 1.5;
-$doLogging = false;
+$doLogging = true;
 $doDebug = false; # =true; turn on additional display, may break placefile for GRLevelX
 # NWS timezone abbreviations used per https://www.weather.gov/gis/Counties
 # appears in Forecast, County and Fire zones (not in Marine)
@@ -112,9 +105,9 @@ if(isset($_REQUEST['sce']) and strtolower($_REQUEST['sce']) == 'view') {
    exit;
  }
 
-if(isset($doShowDetails)) {$showDetails = $doShowDetails;}
+////if(isset($doShowDetails)) {$showDetails = $doShowDetails;}
 if(isset($doShowMarine))      {$showMarine  = $doShowMarine;}
-$titleExtra = ($showDetails)?'Details':'Areas';
+$titleExtra = 'Details';
 if($showMarine) {
 	$titleExtra = 'Marine '.$titleExtra;
 	$alertsURL = 'https://api.weather.gov/alerts/active?status=actual&region_type=marine';
@@ -146,10 +139,15 @@ if(isset($longitude) and $longitude >= -180.0 and $longitude <= 180.0) {
 	print "Longitude outside range -180.0 to +180.0\n";
 	exit;
 }	
+
+/*
 if(!isset($latitude) or !isset($longitude) or !isset($GRversion)) {
 	print "This script only runs via a GRlevelX placefile manager.";
 	exit();
 }
+*/
+
+
 //*/
 if(isset($doLogging) and $doLogging) {
 	$fn = "NWS-placefile-log-".gmdate('Y-m-d').'.txt';
@@ -169,7 +167,7 @@ use Shapefile\ShapefileException;
 use Shapefile\ShapefileReader;
 
 include_once("NWS-zones-inc.txt"); # Master zone:shapefiles lookup table
-global $zoneLookup, $showDetails,$doDebug;
+global $zoneLookup,$doDebug;
 
 include_once('WWAColors.php');  # colors array indexed by alert headline
 
@@ -184,9 +182,7 @@ $output .= "; running on PHP ".phpversion()."\n";
 $output .= "Title: NWS Alert $titleExtra - $today\n";
 $output .= "Refresh: 8\n";
 $output .= "Font: 1, 11, 1, \"Arial\"\n\n";
-
-# Allow user to enable icons: ?icons=y
-if($showIcons && !$showDetails) { # display icons in middle of areas
+if($icons) { # display icons in middle of areas
 	$output .= "IconFile: 1, 17, 17, 8, 8, alerts-icons.png\n";
 }
 
@@ -198,7 +194,7 @@ echo $output;
 # -----------------------------------------------------
 # functions
 function JSONread($url) {
-	global $zoneLookup, $cacheFilename,$cacheTimeMax,$latitude,$longitude, $maxDistance,$showDetails,$titleExtra,$doDebug ;
+	global $zoneLookup, $cacheFilename,$cacheTimeMax,$latitude,$longitude, $maxDistance,$titleExtra,$doDebug ;
   # read alerts.weather.gov for active alerts and process the JSON return
   # author: Ken True - webmaster@saratoga-weather.org
   # Version 1.00 - 24-Aug-2023 - initial release
@@ -335,13 +331,12 @@ function JSONread($url) {
 #---------------------------------------------------------------------------
 
 function decodeAlert($A) {
-  global $color,$zoneLookup,$excludeAlerts,$includeAlerts,$timeFormat,$latitude,$longitude,$maxDistance,$showDetails,$titleExtra,$doDebug;
+  global $color,$zoneLookup,$excludeAlerts,$timeFormat,$latitude,$longitude,$maxDistance,$titleExtra,$doDebug;
 	global $NWStimeZones;
-	$tOut = "";
   # Decode a specific alert 
 	# return out as the full entry for the alert to JSONread for appending (uttimately) to $output for printing the placefile
 	#
-	# depending on $showDetails, either a Line:,coords,End: or a Polygon,coords,End:,Icon: will be returned for
+	# depending on details, either a Line:,coords,End: or a Polygon,coords,End:,Icon: will be returned for
 	# each active.
 	#
 	# Placefile comments (prepended with ;) will be returned for any issues found (expired, not in range, no coords availabl)
@@ -535,8 +530,17 @@ Icon: 2, 0, "... <alert text>"
     $description = str_replace("\n",'\n',$P["description"]); # convert embedded newline into \n chars
     $description = str_replace('"','\"',$description);      # swap embedded " with \"
 	} else {
-		$description = '';
+		$description = 'n/a';
 	}
+
+	if(!empty($P['instruction'])) {
+    $instruction = str_replace("\n",'\n',$P["instruction"]); # convert embedded newline into \n chars
+    $instruction = str_replace('"','\"',$instruction);      # swap embedded " with \"
+	} else {
+		$instruction = 'n/a';
+	}
+	
+
 
   $event_onset = $P["onset"];
   $onset = date($timeFormat,strtotime($event_onset));
@@ -578,11 +582,9 @@ Icon: 2, 0, "... <alert text>"
 		list($tFC,$tMsg) = get_center($nCoords);
 		if($tFC !== false) {$firstCoord = $tFC;}
 		$out .= $tMsg;
-		if($showDetails) {
-	   $coordsFrom = '\n(lines are around NWS alert area)\n';
-		} else {
-	   $coordsFrom = '\n(shading is NWS alert area)\n';
-		}
+	    
+		$coordsFrom = '\n(lines are around NWS alert area)\n';
+		
 		if($doDebug) {$out .= "; decodeAlert: ".count($nCoords)." polygon coords found. firstCoord='$firstCoord'\n"; }
 	} else { # no geometry provided .. will create later from Zone entries
 		$coords = '';
@@ -632,18 +634,6 @@ Icon: 2, 0, "... <alert text>"
 		$out .= "; excluded in \$excludeAlerts\n\n";
 		if($doDebug) { $out .= "; decodeAlert: returned-#3\n"; }
 		return($out); # yes, excluded by event
-	}
-
-	# see if we need to not include this event type
-	if (!empty($includeAlerts) and !in_array($event,$includeAlerts)) {
-		$out .= "; $headline \n";
-    $out .= "; active: $onset to $expires\n";
-		$out .= "; severity=$severity\n";
-		$tZones = implode(', ',$P['geocode']['UGC']);
-		$out .= "; zone(s) '$tZones'\n";
-		$out .= "; not included in \$includeAlerts\n\n";
-		if($doDebug) { $out .= "; decodeAlert: returned-#7\n"; }
-		return($out); # yes, not included by event
 	}
 	
 	# see if the event has expired (unlikely, I hope)
@@ -701,9 +691,23 @@ Icon: 2, 0, "... <alert text>"
 					"Severity:  $severity\\n".
 					"Urgency:   $urgency\\n".
 					"Certainty: $certainty\\n".
-					"Sender:    $senderName\\n".
-          "\\n$headline\\n\\n".
+					"Sender:    $senderName\\n".					
+					"Headline:	$headline\\n".
+					
+					"\\nDescription:\\n$description\\n".
+					"\\nInstruction:\\n$instruction\\n\\n".					
+					
+					
 					"$NWSheadline" . "\"\n";
+#					"description:" . "\"\n"."$description" . "\"\n".
+
+#					"Description:    $description\\n".
+#					"Instruction:    $instruction\\n".
+
+			
+#					"$NWSheadline\\n\\ndescription:\\n$description\\n\\ninstruction:\\n$instruction\\n\\n";
+					
+					
 #          "\\n\\n$headline\\n\\n$description"."\"\n";
 	
   if($doDebug) {
@@ -738,31 +742,24 @@ Icon: 2, 0, "... <alert text>"
   if(strlen($coords) > 10) {
 		if($doDebug) { $out .= "; decodeAlert: coords processing\n"; }
 
-		if(!$showDetails) { # for areas, change the first coordinate to have the color scheme
-			list($cLat,$cLon) = explode(',',$firstCoord);
-			$coords = $firstCoord.",".str_replace(' ',',',$colors).",150\n".$coords;
-		}
+		//if(!$showDetails) { # for areas, change the first coordinate to have the color scheme
+		//	list($cLat,$cLon) = explode(',',$firstCoord);
+		//	$coords = $firstCoord.",".str_replace(' ',',',$colors).",150\n".$coords;
+		//}
 		if(empty($tCmd)) { # tCmd is used for the main command 
 			$tCmd = '';
-			if($showDetails) { # do Line
-				$tCmd .= "Color: $colors\n";
-				$tCmd .= 'Line: 2, 0, "' . str_replace($timeMarker,get_popup_local_times($P,$UGC_array[0]),$popup_template);
-			} else { # do Polygon
-				$colors = str_replace(' ',',',$colors);
-				$icon = get_iconnumber($event);
-				$tCmd .= "Polygon:\n";
-			}
+			$tCmd .= "Color: $colors\n";
+			$icon = get_iconnumber($event);
+			$tCmd .= 'Line: 2, 0, "' . str_replace($timeMarker,get_popup_local_times($P,$UGC_array[0]),$popup_template);
 		}
 
-    if($showDetails) { # a Line: command
 	    $out .= $prefix.str_replace("\"\n",$coordsFrom."\"\n",$tOut.$tCmd).$coords;
-      $out .= "End:\n";
-		} else { # a Polygon: command
-      $out .= $prefix.$tOut.$tCmd.$coords;
-      $out .= "End:\n";
-			$popup = str_replace($timeMarker,get_popup_local_times($P,$UGC_array[0]),$popup_template);
-			$out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
-		}
+            $out .= "End:\n";
+	$popup = str_replace($timeMarker,get_popup_local_times($P,$UGC_array[0]),$popup_template);
+	if ($icons) {
+	$out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
+	}
+	
 		$out .= "; end geometry entry\n\n";
 		if($doDebug) { $out .= "; decodeAlert returned-#7\n"; }
 		return($out); # finished an entry for alert with geometry
@@ -783,15 +780,15 @@ Icon: 2, 0, "... <alert text>"
 		
 		list($coords,$errors,$coordsArray) = get_shape_coords($zone); # this does a coordinate retrieval from the shapefile
 		$nCoords = explode("\n",$coords);
-		if($showDetails) {
-		  $coordsFrom = '\n(lines are around Zone '.$zone.')\n';
-		} else {
-		  $coordsFrom = '\n(shading is Zone '.$zone.')\n';
-		}
+
+		$coordsFrom = '\n(lines are around Zone '.$zone.')\n';
+
 
 		$tCmd = "; this zone is $zone with ".count($nCoords)." coordinates.\n";
 
-		if($showDetails) { # do Line: command
+
+/*		
+//BUGGY!!!!  This is broken code.....		
 			$tCmd .= "Color: $colors\n";
 			$popup = str_replace($timeMarker,get_popup_local_times($P,$zone),$popup_template);
 			$LineCmd = 'Line: 2, 0, "' . $popup;
@@ -801,13 +798,46 @@ Icon: 2, 0, "... <alert text>"
 				$nCoords = explode("\n",$coords);		
 			}
 		} else { # do Polygon and Icon commands
+*/
+//BUG!!!!!!
+
+
+			$tCmd .= "Color: $colors\n";
+			$popup = str_replace($timeMarker,get_popup_local_times($P,$zone),$popup_template);
+			
+			if ($icons) {
+			if(!empty($cLat) and !empty($cLon)) {
+				$icon = get_iconnumber($event);
+			}
+			}
+			
+			$LineCmd = 'Line: 2, 0, "' . $popup;
+			$tCmd .= $LineCmd;
+			
+			///echo "TEST!!!!!!!! count($coordsArray): ".$coordsArray;
+	
+			if ($coordsArray) {
+			if(count($coordsArray) > 1) {
+				$coords = $coordsArray[0]; # multiple segments.. use first one.
+				$nCoords = explode("\n",$coords);		
+			}
+			}
+
+
+
+
+
+			
+		/*
 			$colors = str_replace(' ',',',$colors);
 			if(!empty($cLat) and !empty($cLon)) {
 				$icon = get_iconnumber($event);
 			}
 			$LineCmd = '';
 			$tCmd .= "Polygon:\n";
-		}
+			
+		*/	
+
 
 		$firstCoord = $nCoords[0];
 		if(count($nCoords) > 99999) { # disabled after adding prune_polygon function
@@ -823,24 +853,13 @@ Icon: 2, 0, "... <alert text>"
 		}
 		
 		unset($nCoords);
-		if(!$showDetails and count($coordsArray) > 1) { # Polygon .. needs color info on first coordinate
-			foreach ($coordsArray as $kk => $coords) {
-				$tC = explode("\n",$coords);
-				$firstCoord = $tC[0];
-			  $coords = $firstCoord.",".str_replace(' ',',',$colors).",150\n".$coords;
-				$out .= "; polygon $kk has ".count($tC)." points.\n";
-				$out .= "Polygon:\n";
-				$out .= $coords;
-				$out .= "End:\n";
-			}
-			$out .= "; --- end multipolygon for area ---\n";
-		} else {
-			$coords = $firstCoord.",".str_replace(' ',',',$colors).",150\n".$coords;
-		  $out .= $prefix.str_replace("\"\n",$coordsFrom."\"\n",$tOut.$tCmd).$coords;
-      $out .= "End:\n";
-		}
 		
-		if($showDetails and count($coordsArray) > 1) {
+		$coords = $firstCoord.",".str_replace(' ',',',$colors).",150\n".$coords;
+		$out .= $prefix.str_replace("\"\n",$coordsFrom."\"\n",$tOut.$tCmd).$coords;
+        $out .= "End:\n";
+
+
+		if(count($coordsArray) > 1) {
 			$out .= "; --- multipolygon for line ---\n";
 			foreach ($coordsArray as $kk => $coords) {
 				if($kk == 0) {continue;} # already emitted it above
@@ -855,10 +874,12 @@ Icon: 2, 0, "... <alert text>"
 			$out .= $errors;
 		}
 
-		if(!$showDetails) { # Polygon.. place Icon after so it will show on top of area in GRLevel3
-		  $popup = str_replace($timeMarker,get_popup_local_times($P,$zone),$popup_template);
-			$out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
+		if($icons) { 		
+		#place Icon after so it will show on top of area in Radar App  		
+		$popup = str_replace($timeMarker,get_popup_local_times($P,$zone),$popup_template);
+		$out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
 		}
+		
 		$out .= "; coords have ".count($coordsArray)." polygon rings \n";
 		$out .= "; end end zone $zone\n\n";
 		$coords = '';
@@ -918,8 +939,7 @@ function get_shape_coords ($zone) {
 	} else {
 		return(array(
 		"; get_shape_coords: '$zone' not found.\n",
-		"; get_shape_coords: '$zone' not found.\n",
-   array()) );
+		"; get_shape_coords: '$zone' not found.\n") );
 	}
 
   try {
@@ -942,8 +962,7 @@ function get_shape_coords ($zone) {
 				if ($Geometry->isDeleted()) {
 						return( array(
 						"; get_shape_coords -- deleted record idx=$idx\n",
-						"; get_shape_coords -- deleted record idx=$idx\n",
-            array()));
+						"; get_shape_coords -- deleted record idx=$idx\n" ));
 				}
 
 				$GDATA = $Geometry->getArray();
@@ -968,7 +987,6 @@ function get_shape_coords ($zone) {
 								return(array(
 								"; get_shape_coords: Do you want the Earth to change its rotation direction?!?\n",
 								"; get_shape_coords: Do you want the Earth to change its rotation direction?!?\n",
-                  array()
 								));
 								break;
 								
@@ -978,7 +996,7 @@ function get_shape_coords ($zone) {
 										. " Message: " . $e->getMessage()
 										. " Details: " . $e->getDetails() 
 										. "\n";
-								return(array($str,$str,array()));
+								return(array($str,$str));
 								break;
 				}
     }
@@ -988,8 +1006,7 @@ function get_shape_coords ($zone) {
     */
 		return ( array(
 		  "; get_shape_coords: unable to open Shapefile $filename \n",
-		  "; get_shape_coords: unable to open Shapefile $filename \n".
-      array()
+		  "; get_shape_coords: unable to open Shapefile $filename \n"
 			));
   }
 	
@@ -1189,7 +1206,7 @@ Polygon 	array (
     /*:: :*/
     /*:: Official Web site: http://www.zipcodeworld.com :*/
     /*:: :*/
-    /*:: Hexa Software Development Center ï¿½ All Rights Reserved 2004:*/
+    /*:: Hexa Software Development Center © All Rights Reserved 2004:*/
     /*:: :*/
     /*::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
 
