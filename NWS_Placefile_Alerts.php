@@ -335,7 +335,7 @@ function JSONread($url) {
 #---------------------------------------------------------------------------
 
 function decodeAlert($A) {
-  global $color,$zoneLookup,$excludeAlerts,$includeAlerts,$timeFormat,$latitude,$longitude,$maxDistance,$showDetails,$titleExtra,$doDebug;
+  global $color,$zoneLookup,$excludeAlerts,$includeAlerts,$timeFormat,$latitude,$longitude,$maxDistance,$showDetails,$showIcons,$titleExtra,$doDebug;
 	global $NWStimeZones;
 	$tOut = "";
   # Decode a specific alert 
@@ -761,7 +761,7 @@ Icon: 2, 0, "... <alert text>"
       $out .= $prefix.$tOut.$tCmd.$coords;
       $out .= "End:\n";
 			$popup = str_replace($timeMarker,get_popup_local_times($P,$UGC_array[0]),$popup_template);
-			$out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
+			if ($showIcons) $out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
 		}
 		$out .= "; end geometry entry\n\n";
 		if($doDebug) { $out .= "; decodeAlert returned-#7\n"; }
@@ -856,8 +856,8 @@ Icon: 2, 0, "... <alert text>"
 		}
 
 		if(!$showDetails) { # Polygon.. place Icon after so it will show on top of area in GRLevel3
-		  $popup = str_replace($timeMarker,get_popup_local_times($P,$zone),$popup_template);
-			$out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
+			$popup = str_replace($timeMarker,get_popup_local_times($P,$zone),$popup_template);
+			if ($showIcons) $out .= "Icon: $cLat,$cLon,0,1,$icon,\"".str_replace("\"\n",$coordsFrom."\"\n",$popup);
 		}
 		$out .= "; coords have ".count($coordsArray)." polygon rings \n";
 		$out .= "; end end zone $zone\n\n";
